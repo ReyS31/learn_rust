@@ -7,6 +7,10 @@ pub struct Player {
     def: i64,
     hp: i64,
     mp: i64,
+    next_lv_cap: u64,
+    exp: u64,
+    played: u32,
+    buffed_count: u32,
     rng: rand::rngs::ThreadRng,
 }
 
@@ -19,7 +23,11 @@ impl Player {
             atk: rng.gen_range(1..=10),
             def: rng.gen_range(1..=7),
             hp: rng.gen_range(10..=30),
-            mp: rng.gen_range(5..=20),
+            mp: rng.gen_range(5..=10),
+            next_lv_cap: 2,
+            exp: 0,
+            played: 0,
+            buffed_count: 0,
             rng: rng,
         }
     }
@@ -39,6 +47,10 @@ impl Player {
             def,
             hp,
             mp,
+            next_lv_cap: 2,
+            exp: 0,
+            played: 0,
+            buffed_count: 0,
             rng: rand::thread_rng(),
         }
     }
@@ -50,7 +62,9 @@ impl Player {
         self.atk = self.atk + self.rng.gen_range(lv_ok..=10 + lv_ok);
         self.def = self.def + self.rng.gen_range(lv_ok..=7 + lv_ok);
         self.hp = self.hp + self.rng.gen_range(lv_ok + 10..=30 + lv_ok);
-        self.mp = self.mp + self.rng.gen_range(lv_ok + 5..=20 + lv_ok);
+        self.mp = self.mp + self.rng.gen_range(lv_ok + 5..=10 + lv_ok);
+        self.next_lv_cap = self.next_lv_cap * 2;
+        self.exp = 0;
         println!("{} Leveled up to {}", self.name, self.level);
     }
 
@@ -62,6 +76,17 @@ impl Player {
         println!("def: {}", self.def);
         println!("hp: {}", self.hp);
         println!("mp: {}", self.mp);
+        println!("played: {}", self.played);
+        println!("buff: {}", self.buffed_count);
+    }
+
+    fn got_exp(&mut self) {
+        self.played = self.played + 1;
+        if self.next_lv_cap <= self.exp {
+            self.level_up();
+        } else {
+            self.exp = self.exp + 1;
+        }
     }
 
     fn damaged(&mut self, damage: i64, attacker: &str) {
@@ -107,7 +132,7 @@ impl Player {
             self.buff();
         }
 
-        if self.rng.gen_bool(3.0 / 20.0) {
+        if self.hp > 0 && self.rng.gen_bool(3.0 / 20.0) {
             self.heal();
         }
     }
@@ -117,6 +142,7 @@ impl Player {
             println!("{} already dead, can't attack", self.name);
             return;
         }
+        self.got_exp();
         foe.damaged(self.atk, &self.name);
     }
 
@@ -135,21 +161,33 @@ impl Player {
     fn buff(&mut self) {
         println!("BUFFS");
         let buff_rate = self.rng.gen_range(0.1..1.0);
+
+        let atk_buff = self.rng.gen_bool(buff_rate);
         // ATK buff
-        if self.rng.gen_bool(buff_rate) {
+        if atk_buff {
             let atk_added = (self.atk as f64 * self.rng.gen_range(0.1..0.5)).floor() as i64;
             println!("{} attack buffed by {}", self.name, atk_added);
             self.atk = self.atk + atk_added;
         }
-        if self.rng.gen_bool(buff_rate) {
+
+        let def_buff = self.rng.gen_bool(buff_rate);
+        // DEF buff
+        if def_buff {
             let def_added = (self.def as f64 * self.rng.gen_range(0.1..0.5)).floor() as i64;
             println!("{} def buffed by {}", self.name, def_added);
             self.def = self.def + def_added;
         }
-        if self.rng.gen_bool(buff_rate) {
+
+        let healing = self.rng.gen_bool(buff_rate);
+        // HEALING
+        if healing {
             let free_heal = (self.hp as f64 * self.rng.gen_range(0.1..0.5)).floor() as i64;
             println!("{} healed {}hp", self.name, free_heal);
             self.hp = self.hp + free_heal;
+        }
+
+        if def_buff || atk_buff || healing {
+            self.buffed_count = self.buffed_count + 1;
         }
     }
 
