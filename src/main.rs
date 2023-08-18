@@ -1,75 +1,30 @@
-use rand::Rng;
-struct User {
-    name: String,
-    level: u32,
-    atk: i128,
-    def: i128,
-    hp: i128,
-    mp: i128,
-}
+mod player;
+use std::time::Duration;
 
-impl User {
-    fn new(player_name: &str) -> Self {
-        let mut rng = rand::thread_rng();
-        User {
-            name: String::from(player_name),
-            level: 1,
-            atk: rng.gen_range(1..10),
-            def: rng.gen_range(1..7),
-            hp: rng.gen_range(10..30),
-            mp: rng.gen_range(5..20),
-        }
-    }
-
-    fn level_up(&mut self) {
-        let level = self.level + 1;
-        let lv_ok: i128 = level.into();
-        let mut rng = rand::thread_rng();
-        self.level = level;
-        self.atk = self.atk + rng.gen_range(lv_ok..10 + lv_ok);
-        self.def = self.def + rng.gen_range(lv_ok..7 + lv_ok);
-        self.hp = self.hp + rng.gen_range(lv_ok + 10..30 + lv_ok);
-        self.mp = self.mp + rng.gen_range(lv_ok + 5..20 + lv_ok);
-        println!("{} Leveled up to {}", self.name, self.level);
-    }
-
-    fn info(&mut self) {
-        println!("=======INFO======");
-        println!("name: {}", self.name);
-        println!("level: {}", self.level);
-        println!("atk: {}", self.atk);
-        println!("def: {}", self.def);
-        println!("hp: {}", self.hp);
-        println!("mp: {}", self.mp);
-    }
-
-    fn damaged(&mut self, damage: i128) {
-        let total_damage = (self.def - damage).abs();
-        self.hp = self.hp - total_damage;
-        println!("{} got {} damage", self.name, total_damage);
-    }
-
-    fn attack(&mut self, foe: &mut User) {
-        foe.damaged(self.atk);
-    }
-
-    fn is_dead(&mut self) -> bool {
-        self.hp <= 0
-    }
-}
-
+use player::Player;
 fn main() {
-    let mut a: i32 = 6;
-    println!("Nilai dari a adalah {a}");
-    a = a.pow(2);
+    royal_rumbel();
+}
 
-    println!("Nilai dari a adalah {a}");
+fn royal_rumbel() {
+    let users_a: &mut [Player; 3] = &mut [
+        Player::new("Rizma"),
+        Player::new("Denzo"),
+        Player::new("Palkimov"),
+    ];
 
-    let mut user = User::new("Rizma");
-    let mut user_den = User::new("Denzo");
+    let users_b: &mut [Player; 3] = &mut [
+        Player::new("Akhrad"),
+        Player::new("Bonnaque"),
+        Player::new("Centrone"),
+    ];
 
-    user.info();
-    user_den.info();
+    users_a.iter_mut().for_each(|user| {
+        user.info();
+    });
+    users_b.iter_mut().for_each(|user| {
+        user.info();
+    });
 
     let mut loop_breaker = 0;
     loop {
@@ -77,28 +32,71 @@ fn main() {
         if loop_breaker > 9 {
             break;
         }
-        user.level_up();
-        user_den.level_up();
+        users_a.iter_mut().for_each(|user| {
+            user.level_up();
+        });
+        users_b.iter_mut().for_each(|user| {
+            user.level_up();
+        });
     }
 
-    user.info();
-    user_den.info();
+    users_a.iter_mut().for_each(|user: &mut Player| {
+        user.info();
+    });
+    users_b.iter_mut().for_each(|user: &mut Player| {
+        user.info();
+    });
 
+    println!("=======ROUND START======");
+    let mut a_won = false;
+    loop_breaker = 1;
     loop {
-        user.attack(&mut user_den);
-        user_den.attack(&mut user);
-        if user.is_dead() || user_den.is_dead() {
+        let total_dead_a = users_a
+            .iter_mut()
+            .fold(0, |acc: i8, user| acc + user.is_dead_num());
+        let total_dead_b = users_b
+            .iter_mut()
+            .fold(0, |acc: i8, user| acc + user.is_dead_num());
+        if total_dead_a >= 3 || total_dead_b >= 3 {
+            if total_dead_b >= 3 {
+                a_won = true;
+            }
             break;
         }
-    }
-    println!("GAME OVER");
-    user.info();
-    user_den.info();
 
-    let winners_name: String = if user.hp < user_den.hp {
-        user_den.name
+        std::thread::sleep(Duration::from_secs(1));
+        println!("=======ROUND {}======", loop_breaker);
+
+        let user_a_atk = player::get_alive_players(users_a);
+        let user_a_def = player::get_alive_players(users_a);
+        let user_b_atk = player::get_alive_players(users_b);
+        let user_b_def = player::get_alive_players(users_b);
+
+        users_a[user_a_atk].attack(&mut users_b[user_b_def]);
+        users_b[user_b_atk].attack(&mut users_a[user_a_def]);
+
+        loop_breaker = loop_breaker + 1;
+    }
+
+    println!("GAME OVER");
+    users_a.iter_mut().for_each(|user: &mut Player| {
+        user.info();
+    });
+    users_b.iter_mut().for_each(|user: &mut Player| {
+        user.info();
+    });
+    let total_dead_a = users_a
+        .iter_mut()
+        .fold(0, |acc: i8, user| acc + user.is_dead_num());
+    let total_dead_b = users_b
+        .iter_mut()
+        .fold(0, |acc: i8, user| acc + user.is_dead_num());
+    if a_won {
+        println!("THE WINNER IS A");
     } else {
-        user.name
-    };
-    println!("{} wins", winners_name);
+        println!("THE WINNER IS B");
+    }
+    println!("TOTAL ROUNDS: {}", loop_breaker);
+    println!("TOTAL A DEATHS: {}", total_dead_a);
+    println!("TOTAL B DEATHS: {}", total_dead_b);
 }
